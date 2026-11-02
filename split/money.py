@@ -24,14 +24,16 @@ def format_amount(cents: int) -> str:
 
 
 def split_equally(total: int, sharing: list[str], payer: str) -> dict[str, int]:
-    """Split total cents among the people sharing, in listed order.
+    """Split total cents among the people sharing.
 
-    The leftover cents go to the payer if they are sharing, else to the first person sharing.
+    Leftover cents go one each: the payer first if they are sharing, then the others in listed order.
     Shares always add up to the total.
     """
     if not sharing:
         raise ValueError("Nobody to share with")
     base, extra = divmod(total, len(sharing))
+    order = ([payer] if payer in sharing else []) + [m for m in sharing if m != payer]
     shares = {m: base for m in sharing}
-    shares[payer if payer in shares else sharing[0]] += extra
+    for m in order[:extra]:
+        shares[m] += 1
     return shares
