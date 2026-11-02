@@ -1,0 +1,46 @@
+# How Split's team works. Versioned like code: the PM proposes one change at a time,
+# the person approves it, and the next version is measured against this one.
+version: 1
+budget:
+  per_day_usd: 40
+  max_agents: 5
+stations:
+  shape:
+    role: solution-designer
+    agents: 1
+    model: claude-opus-5-5
+    effort: high
+    mode: on-call
+  plan:
+    role: pm
+    agents: 1
+    model: claude-opus-5-5
+    effort: high
+    mode: always-on
+    rules:
+      - Turn each use case into tasks in Mycelium, one feature at a time.
+  build:
+    role: dev
+    agents: 2
+    model: claude-sonnet-5-5
+    effort: medium
+    mode: always-on
+    rules:
+      - Work in your own clone, on a branch per task.
+  verify:
+    role: qa
+    agents: 1
+    model: claude-sonnet-5-5
+    effort: medium
+    mode: always-on
+    rules:
+      - Run the golden sets on the branch and report every scenario to Mycelium.
+  review:
+    role: reviewer
+    agents: 1
+    model: claude-opus-5-5
+    effort: high
+    mode: on-call
+    gate: approves the branch or asks for changes
+  release:
+    gate: the person approves each merge to main

@@ -1,0 +1,21 @@
+[project]
+name = "split"
+version = "0.0.1"
+description = "Split bills with friends and see who owes whom. Grotti's sample product."
+requires-python = ">=3.12"
+dependencies = ["fastapi>=0.115", "uvicorn>=0.30", "jinja2>=3.1", "python-multipart>=0.0.9"]
+
+[dependency-groups]
+dev = [
+    "httpx2>=2.16.0",
+    "pytest>=8.3",
+    "pytest-bdd>=8.0",
+]
+
+[tool.uv]
+package = false
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+bdd_features_base_dir = ".mycelium/specs/"

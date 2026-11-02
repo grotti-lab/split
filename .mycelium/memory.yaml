@@ -1,0 +1,7 @@
+# Short facts every agent on Split's team reads in its briefing (Mycelium team memory).
+- Split is Grotti's sample product. Its brief is BRIEF.md; its golden sets are .mycelium/specs/*.feature.
+- The scenario text in .mycelium/specs is the person's. Never edit it to make a test pass; propose a change with propose_scenario and say why.
+- Money is stored as whole cents (integers) and shown with two decimals.
+- There are no accounts in the first release. Anyone with a group's link can use the group, and members are names.
+- Run everything with make test. make golden runs only the golden sets and prints how many use cases work; make report sends each scenario's result to Mycelium.
+- Step definitions for the golden sets go in tests/golden/steps.py, or a steps module per feature imported from tests/golden/test_golden_sets.py.
