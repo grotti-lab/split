@@ -173,6 +173,21 @@ def owes(client, groups, name, amount):
     assert nets_on_page(client, groups)[name] == f"owes {amount}"
 
 
+def payments_on_page(client, groups) -> list:
+    page = client.get(list(groups.values())[-1]).text
+    return re.findall(r'<div class="payment">(.*?)</div>', page)
+
+
+@then(parsers.parse("the suggested payments are {payments}"))
+def suggested_payments_are(client, groups, payments):
+    assert sorted(payments_on_page(client, groups)) == sorted(n.strip('"') for n in split_names(payments))
+
+
+@then(parsers.parse('the only suggested payment is "{payment}"'))
+def only_suggested_payment(client, groups, payment):
+    assert payments_on_page(client, groups) == [payment]
+
+
 # --- sharing the link -----------------------------------------------------------------------
 
 @pytest.fixture
