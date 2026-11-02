@@ -54,6 +54,15 @@ def create_app(db_path: str | Path | None = None) -> FastAPI:
             raise HTTPException(404, "No such group")
         return TEMPLATES.TemplateResponse(request, "group.html", {"group": group})
 
+    @app.post("/groups/{slug}/members")
+    def add_member(slug: str, name: str = Form(...)) -> RedirectResponse:
+        name = name.strip()
+        if not name:
+            raise HTTPException(422, "A member needs a name")
+        if not db.add_member(app.state.db_path, slug, name):
+            raise HTTPException(404, "No such group")
+        return RedirectResponse(f"/groups/{slug}", status_code=303)
+
     @app.get("/health")
     def health() -> dict:
         return {"ok": True}

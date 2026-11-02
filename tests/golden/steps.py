@@ -36,6 +36,20 @@ def create_group(client, groups, name, members):
     groups[name] = str(r.url)
 
 
+@given(parsers.parse('a group "{name}" with members {members}'))
+def existing_group(client, groups, name, members):
+    r = client.post("/groups", data={"name": name, "members": ",".join(split_names(members))})
+    assert r.status_code == 200
+    groups[name] = str(r.url)
+
+
+@when(parsers.parse("someone adds {name} to the group"))
+def add_member(client, groups, name):
+    link = list(groups.values())[-1]
+    r = client.post(link + "/members", data={"name": name})
+    assert r.status_code == 200
+
+
 @then(parsers.parse('the group "{name}" has the members {members}'))
 def group_has_members(client, groups, name, members):
     page = client.get(groups[name]).text
