@@ -51,3 +51,13 @@ def get_group(path: Path, slug: str) -> dict | None:
             return None
         rows = conn.execute("SELECT name FROM members WHERE group_id = ? ORDER BY id", (g["id"],)).fetchall()
         return {"slug": g["slug"], "name": g["name"], "members": [r["name"] for r in rows]}
+
+
+def add_member(path: Path, slug: str, name: str) -> bool:
+    """Add a member to a group. False if the group doesn't exist."""
+    with connect(path) as conn:
+        g = conn.execute("SELECT id FROM groups WHERE slug = ?", (slug,)).fetchone()
+        if g is None:
+            return False
+        conn.execute("INSERT INTO members(group_id, name) VALUES(?, ?)", (g["id"], name))
+        return True
