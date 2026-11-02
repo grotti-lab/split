@@ -57,12 +57,14 @@ def create_app(db_path: str | Path | None = None) -> FastAPI:
         for e in expenses:
             e["amount_text"] = money.format_amount(e["amount"])
             e["shares_text"] = [(n, money.format_amount(c)) for n, c in e["shares"]]
-        nets = balances.balances(group["members"], expenses, db.list_payments(app.state.db_path, slug))
+        recorded = db.list_payments(app.state.db_path, slug)
+        nets = balances.balances(group["members"], expenses, recorded)
         return {
             "group": group, "expenses": expenses,
             "balances": [(n, balances.net_text(nets[n])) for n in group["members"]],
             "payments": [balances.payment_text(p) for p in balances.suggested_payments(nets)],
-            "all_settled": bool(expenses or db.list_payments(app.state.db_path, slug)) and not any(nets.values()),
+            "recorded": [{**p, "amount_text": money.format_amount(p["amount"])} for p in recorded],
+            "all_settled": bool(expenses or recorded) and not any(nets.values()),
         }
 
     @app.get("/groups/{slug}", response_class=HTMLResponse)
@@ -150,6 +152,12 @@ def create_app(db_path: str | Path | None = None) -> FastAPI:
                 status_code=422,
             )
         db.add_payment(app.state.db_path, slug, payer, payee, cents)
+        return RedirectResponse(f"/groups/{slug}", status_code=303)
+
+    @app.post("/groups/{slug}/payments/{payment_id}/delete")
+    def delete_payment(slug: str, payment_id: int) -> RedirectResponse:
+        if not db.delete_payment(app.state.db_path, slug, payment_id):
+            raise HTTPException(404, "No such payment")
         return RedirectResponse(f"/groups/{slug}", status_code=303)
 
     @app.post("/groups/{slug}/expenses/{expense_id}/delete")

@@ -178,3 +178,12 @@ def list_payments(path: Path, slug: str) -> list[dict]:
             "SELECT p.id, f.name AS \"from\", t.name AS \"to\", p.amount FROM payments p "
             "JOIN groups g ON g.id = p.group_id JOIN members f ON f.id = p.from_id "
             "JOIN members t ON t.id = p.to_id WHERE g.slug = ? ORDER BY p.id", (slug,))]
+
+
+def delete_payment(path: Path, slug: str, payment_id: int) -> bool:
+    """Remove a recorded payment of this group. False if there is no such payment."""
+    with connect(path) as conn:
+        cur = conn.execute(
+            "DELETE FROM payments WHERE id = ? AND group_id = (SELECT id FROM groups WHERE slug = ?)",
+            (payment_id, slug))
+        return cur.rowcount > 0

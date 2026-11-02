@@ -238,3 +238,15 @@ def group_shows(client, groups, text):
     import html
 
     assert text in html.unescape(client.get(list(groups.values())[-1]).text)
+
+
+@when(parsers.parse("someone deletes {who}'s payment to {to}"))
+def delete_payment(client, groups, who, to):
+    link = list(groups.values())[-1]
+    page = client.get(link).text
+    for block in re.findall(r'<div class="recorded-payment".*?</form>', page, re.S):
+        if re.search(r'data-from="(.*?)" data-to="(.*?)"', block).groups() == (who, to):
+            action = re.search(r'<form method="post" action="(.*?)"', block).group(1)
+            assert client.post(action).status_code == 200
+            return
+    raise AssertionError(f"no payment from {who} to {to} on the page")
