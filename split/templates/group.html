@@ -52,7 +52,11 @@
     <label>Paid by <select name="payer">
       {% for m in group.members %}<option>{{ m }}</option>{% endfor %}
     </select></label>
-    <p>Split equally between everyone</p>
+    <fieldset>
+      <legend>Split equally between</legend>
+      {% for m in group.members %}<label><input type="checkbox" name="sharing" value="{{ m }}" checked> {{ m }}</label>
+      {% endfor %}
+    </fieldset>
     <button type="submit">Add expense</button>
   </form>
 {% endblock %}
