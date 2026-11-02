@@ -33,3 +33,9 @@ Feature: Groups
     When someone removes Chloé from the group
     Then they see the message "Chloé has expenses in this group, so they can't be removed"
     And the group "Lisbon trip" has the members Ana, Ben and Chloé
+
+  Scenario: Names that differ only in capitals are the same name
+    Given a group "Lisbon trip" with members Ana and Ben
+    When someone adds another member called ana
+    Then they see the message "There is already an Ana in this group"
+    And the group "Lisbon trip" has the members Ana and Ben
