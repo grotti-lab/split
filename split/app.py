@@ -78,7 +78,7 @@ def create_app(db_path: str | Path | None = None) -> FastAPI:
         if existing is not None:
             return TEMPLATES.TemplateResponse(
                 request, "group.html",
-                {"group": group, "message": f"There is already an {existing} in this group"},
+                {**_group_context(group, slug), "message": f"There is already an {existing} in this group"},
                 status_code=409,
             )
         db.add_member(app.state.db_path, slug, name)
