@@ -12,4 +12,26 @@
     <label>Add a member <input name="name" required></label>
     <button type="submit">Add</button>
   </form>
+  <h2>Expenses</h2>
+  <div class="expenses">
+    {% for e in expenses %}<div class="expense" data-name="{{ e.description }}">
+      <span class="description">{{ e.description }}</span>
+      <span class="amount">{{ e.amount_text }}</span> paid by <span class="payer">{{ e.payer }}</span>
+      <div class="shares">
+        {% for name, share in e.shares_text %}<span class="share" data-member="{{ name }}">{{ name }} {{ share }}</span>
+        {% endfor %}
+      </div>
+    </div>
+    {% else %}<p class="none">No expenses yet</p>
+    {% endfor %}
+  </div>
+  <form method="post" action="/groups/{{ group.slug }}/expenses">
+    <label>What <input name="description" required></label>
+    <label>Amount <input name="amount" inputmode="decimal" required></label>
+    <label>Paid by <select name="payer">
+      {% for m in group.members %}<option>{{ m }}</option>{% endfor %}
+    </select></label>
+    <p>Split equally between everyone</p>
+    <button type="submit">Add expense</button>
+  </form>
 {% endblock %}
