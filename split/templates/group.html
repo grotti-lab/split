@@ -1,0 +1,10 @@
+{% extends "base.html" %}
+{% block title %}{{ group.name }} · Split{% endblock %}
+{% block body %}
+  <h1>{{ group.name }}</h1>
+  <h2>Members</h2>
+  <ul class="members">
+    {% for m in group.members %}<li>{{ m }}</li>
+    {% endfor %}
+  </ul>
+{% endblock %}
