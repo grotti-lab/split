@@ -8,6 +8,13 @@
     {% for m in group.members %}<li>{{ m }}</li>
     {% endfor %}
   </ul>
+  <div class="remove-members">
+    {% for m in group.members %}<form method="post" action="/groups/{{ group.slug }}/members/remove">
+      <input type="hidden" name="name" value="{{ m }}">
+      <button type="submit" aria-label="Remove {{ m }}">Remove {{ m }}</button>
+    </form>
+    {% endfor %}
+  </div>
   <form method="post" action="/groups/{{ group.slug }}/members">
     <label>Add a member <input name="name" required></label>
     <button type="submit">Add</button>

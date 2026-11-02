@@ -68,6 +68,12 @@ def add_duplicate_member(client, groups, last, name):
     last["response"] = client.post(link + "/members", data={"name": name})
 
 
+@when(parsers.parse("someone removes {name} from the group"))
+def remove_member(client, groups, last, name):
+    link = list(groups.values())[-1]
+    last["response"] = client.post(link + "/members/remove", data={"name": name})
+
+
 @then(parsers.parse('they see the message "{message}"'))
 def see_message(last, message):
     import html
