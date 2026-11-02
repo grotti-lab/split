@@ -20,8 +20,16 @@
         {% for name, share in e.shares_text %}<span class="share" data-member="{{ name }}">{{ name }} {{ share }}</span>
         {% endfor %}
       </div>
+      <form method="post" action="/groups/{{ group.slug }}/expenses/{{ e.id }}/delete">
+        <button type="submit">Delete</button>
+      </form>
     </div>
     {% else %}<p class="none">No expenses yet</p>
+    {% endfor %}
+  </div>
+  <h2>Balances</h2>
+  <div class="balances">
+    {% for name, net in balances %}<div class="balance" data-member="{{ name }}">{{ name }} <span class="net">{{ net }}</span></div>
     {% endfor %}
   </div>
   <form method="post" action="/groups/{{ group.slug }}/expenses">
