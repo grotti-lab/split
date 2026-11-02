@@ -30,3 +30,18 @@ Feature: Settle up
     And Ben recorded paying Ana 10.00
     When someone deletes Ben's payment to Ana
     Then Ben owes 10.00
+
+  Scenario: Changing an expense after settling up opens a new balance
+    Given a group "Lisbon trip" with members Ana and Ben
+    And an expense "Dinner" of 20.00 paid by Ana, split equally
+    And Ben recorded paying Ana 10.00
+    When someone changes the amount of "Dinner" to 30.00
+    Then Ben owes 5.00
+    And the only suggested payment is "Ben pays Ana 5.00"
+
+  Scenario: A payment can't be more than what is owed
+    Given a group "Lisbon trip" with members Ana and Ben
+    And an expense "Dinner" of 20.00 paid by Ana, split equally
+    When Ben records paying Ana 15.00
+    Then they see the message "Ben only owes Ana 10.00"
+    And Ben owes 10.00

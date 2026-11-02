@@ -38,3 +38,9 @@ Feature: Balances
     And an expense "Lunch" of 10.00 paid by Ben, for Chloé only
     Then Ben is settled up
     And the only suggested payment is "Chloé pays Ana 10.00"
+
+  Scenario: The first person sharing covers the leftover cent when the payer isn't sharing
+    Given a group "Lisbon trip" with members Ana, Ben, Chloé and Dan
+    And an expense "Snacks" of 10.00 paid by Ana, split between Ben, Chloé and Dan
+    Then the shares of "Snacks" are Ana 0.00, Ben 3.34, Chloé 3.33 and Dan 3.33
+    And Ana is owed 10.00
