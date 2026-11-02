@@ -18,3 +18,10 @@ def test_payer_not_sharing_first_person_takes_the_leftover():
     shares = split_equally(1000, ["Ben", "Chloé", "Dan"], "Ana")
     assert shares == {"Ben": 334, "Chloé": 333, "Dan": 333}
     assert sum(shares.values()) == 1000
+
+
+def test_several_leftover_cents_go_one_each_payer_first():
+    assert split_equally(1001, ["Ana", "Ben", "Chloé"], "Ana") == {"Ana": 334, "Ben": 334, "Chloé": 333}
+    assert split_equally(1001, ["Ana", "Ben", "Chloé"], "Ben") == {"Ana": 334, "Ben": 334, "Chloé": 333}
+    assert split_equally(1001, ["Ana", "Ben", "Chloé"], "Chloé") == {"Ana": 334, "Ben": 333, "Chloé": 334}
+    assert split_equally(1001, ["Ben", "Chloé", "Dan"], "Ana") == {"Ben": 334, "Chloé": 334, "Dan": 333}

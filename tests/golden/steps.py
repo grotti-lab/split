@@ -142,3 +142,83 @@ def shares_are(client, groups, name, shares):
 @then("the group has no expenses")
 def no_expenses(client, groups):
     assert expenses_on_page(client, groups) == {}
+
+
+@when(parsers.parse('someone deletes the expense "{name}"'))
+def delete_expense(client, groups, name):
+    link = list(groups.values())[-1]
+    page = client.get(link).text
+    for block in re.findall(r'<div class="expense".*?</form>', page, re.S):
+        if re.search(r'data-name="(.*?)"', block).group(1) == name:
+            action = re.search(r'<form method="post" action="(.*?)"', block).group(1)
+            assert client.post(action).status_code == 200
+            return
+    raise AssertionError(f"no expense {name!r} on the page")
+
+
+# --- balances ----------------------------------------------------------------------------
+
+def nets_on_page(client, groups) -> dict:
+    """Member -> net as shown on the group page (text such as 'is owed 20.00')."""
+    page = client.get(list(groups.values())[-1]).text
+    return dict(re.findall(r'class="balance" data-member="[^"]*">(.*?) <span class="net">(.*?)</span>', page))
+
+
+@then(parsers.parse("{name} is settled up"))
+def settled_up(client, groups, name):
+    assert nets_on_page(client, groups)[name] == "is settled up"
+
+
+@then(parsers.parse("{name} is owed {amount}"))
+def is_owed(client, groups, name, amount):
+    assert nets_on_page(client, groups)[name] == f"is owed {amount}"
+
+
+@then(parsers.parse("{name} owes {amount}"))
+def owes(client, groups, name, amount):
+    assert nets_on_page(client, groups)[name] == f"owes {amount}"
+
+
+def payments_on_page(client, groups) -> list:
+    page = client.get(list(groups.values())[-1]).text
+    return re.findall(r'<div class="payment">(.*?)</div>', page)
+
+
+@then(parsers.parse("the suggested payments are {payments}"))
+def suggested_payments_are(client, groups, payments):
+    assert sorted(payments_on_page(client, groups)) == sorted(n.strip('"') for n in split_names(payments))
+
+
+@then(parsers.parse('the only suggested payment is "{payment}"'))
+def only_suggested_payment(client, groups, payment):
+    assert payments_on_page(client, groups) == [payment]
+
+
+# --- sharing the link -----------------------------------------------------------------------
+
+@pytest.fixture
+def opened() -> dict:
+    """The page a fresh visitor got from the group's link."""
+    return {}
+
+
+@when(parsers.parse("{who} opens the group's link"))
+def opens_link(client, groups, opened):
+    from fastapi.testclient import TestClient
+
+    # a new client on the same app: no cookies, no session (there are no accounts)
+    with TestClient(client.app) as fresh:
+        r = fresh.get(list(groups.values())[-1])
+    assert r.status_code == 200
+    opened["page"] = r.text
+
+
+@then(parsers.parse("{who} sees the members {members}"))
+def sees_members(opened, who, members):
+    assert re.findall(r"<li>(.*?)</li>", opened["page"]) == split_names(members)
+
+
+@then(parsers.parse('{who} sees the expense "{name}" of {amount}'))
+def sees_expense(opened, who, name, amount):
+    pattern = rf'data-name="{re.escape(name)}".*?class="amount">{re.escape(amount)}<'
+    assert re.search(pattern, opened["page"], re.S)
