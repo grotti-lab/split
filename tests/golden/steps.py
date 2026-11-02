@@ -161,3 +161,33 @@ def nets_on_page(client, groups) -> dict:
 @then(parsers.parse("{name} is settled up"))
 def settled_up(client, groups, name):
     assert nets_on_page(client, groups)[name] == "0.00"
+
+
+# --- sharing the link -----------------------------------------------------------------------
+
+@pytest.fixture
+def opened() -> dict:
+    """The page a fresh visitor got from the group's link."""
+    return {}
+
+
+@when(parsers.parse("{who} opens the group's link"))
+def opens_link(client, groups, opened):
+    from fastapi.testclient import TestClient
+
+    # a new client on the same app: no cookies, no session (there are no accounts)
+    with TestClient(client.app) as fresh:
+        r = fresh.get(list(groups.values())[-1])
+    assert r.status_code == 200
+    opened["page"] = r.text
+
+
+@then(parsers.parse("{who} sees the members {members}"))
+def sees_members(opened, who, members):
+    assert re.findall(r"<li>(.*?)</li>", opened["page"]) == split_names(members)
+
+
+@then(parsers.parse('{who} sees the expense "{name}" of {amount}'))
+def sees_expense(opened, who, name, amount):
+    pattern = rf'data-name="{re.escape(name)}".*?class="amount">{re.escape(amount)}<'
+    assert re.search(pattern, opened["page"], re.S)
