@@ -57,7 +57,7 @@ def create_app(db_path: str | Path | None = None) -> FastAPI:
         for e in expenses:
             e["amount_text"] = money.format_amount(e["amount"])
             e["shares_text"] = [(n, money.format_amount(c)) for n, c in e["shares"]]
-        nets = balances.nets(group["members"], expenses)
+        nets = balances.balances(group["members"], expenses)
         return {
             "group": group, "expenses": expenses,
             "balances": [(n, balances.net_text(nets[n])) for n in group["members"]],

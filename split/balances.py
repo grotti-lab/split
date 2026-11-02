@@ -9,7 +9,7 @@ from __future__ import annotations
 from . import money
 
 
-def nets(members: list[str], expenses: list[dict]) -> dict[str, int]:
+def balances(members: list[str], expenses: list[dict]) -> dict[str, int]:
     """Member -> net cents, from expenses shaped like db.list_expenses (amount, payer, shares)."""
     net = {m: 0 for m in members}
     for e in expenses:
@@ -20,4 +20,9 @@ def nets(members: list[str], expenses: list[dict]) -> dict[str, int]:
 
 
 def net_text(cents: int) -> str:
-    return money.format_amount(cents)
+    """'is owed 20.00' / 'owes 10.00' / 'is settled up'"""
+    if cents > 0:
+        return f"is owed {money.format_amount(cents)}"
+    if cents < 0:
+        return f"owes {money.format_amount(-cents)}"
+    return "is settled up"
