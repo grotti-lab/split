@@ -50,6 +50,17 @@
     {% else %}<p class="none">{% if all_settled %}Everyone is settled up{% else %}Nothing to pay{% endif %}</p>
     {% endfor %}
   </div>
+  <h2>Recorded payments</h2>
+  <div class="recorded-payments">
+    {% for p in recorded %}<div class="recorded-payment" data-from="{{ p.from }}" data-to="{{ p.to }}">
+      {{ p.from }} paid {{ p.to }} <span class="amount">{{ p.amount_text }}</span>
+      <form method="post" action="/groups/{{ group.slug }}/payments/{{ p.id }}/delete">
+        <button type="submit">Delete</button>
+      </form>
+    </div>
+    {% else %}<p class="none">No payments yet</p>
+    {% endfor %}
+  </div>
   <form method="post" action="/groups/{{ group.slug }}/payments">
     <label>Who paid <select name="payer">
       {% for m in group.members %}<option>{{ m }}</option>{% endfor %}

@@ -207,3 +207,12 @@ def update_expense_amount(path: Path, slug: str, expense_id: int, amount: int) -
                 (shares[r["name"]], expense_id, r["id"]),
             )
         return True
+
+
+def delete_payment(path: Path, slug: str, payment_id: int) -> bool:
+    """Remove a recorded payment of this group. False if there is no such payment."""
+    with connect(path) as conn:
+        cur = conn.execute(
+            "DELETE FROM payments WHERE id = ? AND group_id = (SELECT id FROM groups WHERE slug = ?)",
+            (payment_id, slug))
+        return cur.rowcount > 0
