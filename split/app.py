@@ -140,6 +140,25 @@ def create_app(db_path: str | Path | None = None) -> FastAPI:
             raise HTTPException(404, "No such expense")
         return RedirectResponse(f"/groups/{slug}", status_code=303)
 
+    @app.post("/groups/{slug}/expenses/{expense_id}/edit")
+    def edit_expense(request: Request, slug: str, expense_id: int, amount: str = Form(...)) -> Response:
+        group = db.get_group(app.state.db_path, slug)
+        if group is None:
+            raise HTTPException(404, "No such group")
+        try:
+            cents = money.parse_amount(amount)
+        except ValueError:
+            cents = 0
+        if cents <= 0:
+            return TEMPLATES.TemplateResponse(
+                request, "group.html",
+                {**_group_context(group, slug), "message": "Enter an amount above zero"},
+                status_code=422,
+            )
+        if not db.update_expense_amount(app.state.db_path, slug, expense_id, cents):
+            raise HTTPException(404, "No such expense")
+        return RedirectResponse(f"/groups/{slug}", status_code=303)
+
     @app.get("/health")
     def health() -> dict:
         return {"ok": True}
