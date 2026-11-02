@@ -2,6 +2,7 @@
 {% block title %}{{ group.name }} · Split{% endblock %}
 {% block body %}
   <h1>{{ group.name }}</h1>
+  {% if message %}<p class="message" role="alert">{{ message }}</p>{% endif %}
   <h2>Members</h2>
   <ul class="members">
     {% for m in group.members %}<li>{{ m }}</li>

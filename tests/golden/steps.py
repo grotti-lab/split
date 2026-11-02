@@ -56,6 +56,24 @@ def group_has_members(client, groups, name, members):
     assert re.findall(r"<li>(.*?)</li>", page) == split_names(members)
 
 
+@pytest.fixture
+def last() -> dict:
+    """The last response a scenario's action got, for steps that check what the person saw."""
+    return {}
+
+
+@when(parsers.parse("someone adds another member called {name}"))
+def add_duplicate_member(client, groups, last, name):
+    link = list(groups.values())[-1]
+    last["response"] = client.post(link + "/members", data={"name": name})
+
+
+@then(parsers.parse('they see the message "{message}"'))
+def see_message(last, message):
+    import html
+
+    assert message in html.unescape(last["response"].text)
+
 # --- expenses -------------------------------------------------------------------------------
 
 def parse_split(clause: str) -> dict:
@@ -77,8 +95,8 @@ def post_expense(client, groups, name, amount, payer, split):
 
 
 @when(parsers.parse('{who} adds an expense "{name}" of {amount} paid by {payer}, {split}'))
-def add_expense(client, groups, who, name, amount, payer, split):
-    post_expense(client, groups, name, amount, payer, split)
+def add_expense(client, groups, last, who, name, amount, payer, split):
+    last["response"] = post_expense(client, groups, name, amount, payer, split)
 
 
 @given(parsers.parse('an expense "{name}" of {amount} paid by {payer}, {split}'))
@@ -168,3 +186,33 @@ def suggested_payments_are(client, groups, payments):
 @then(parsers.parse('the only suggested payment is "{payment}"'))
 def only_suggested_payment(client, groups, payment):
     assert payments_on_page(client, groups) == [payment]
+
+
+# --- sharing the link -----------------------------------------------------------------------
+
+@pytest.fixture
+def opened() -> dict:
+    """The page a fresh visitor got from the group's link."""
+    return {}
+
+
+@when(parsers.parse("{who} opens the group's link"))
+def opens_link(client, groups, opened):
+    from fastapi.testclient import TestClient
+
+    # a new client on the same app: no cookies, no session (there are no accounts)
+    with TestClient(client.app) as fresh:
+        r = fresh.get(list(groups.values())[-1])
+    assert r.status_code == 200
+    opened["page"] = r.text
+
+
+@then(parsers.parse("{who} sees the members {members}"))
+def sees_members(opened, who, members):
+    assert re.findall(r"<li>(.*?)</li>", opened["page"]) == split_names(members)
+
+
+@then(parsers.parse('{who} sees the expense "{name}" of {amount}'))
+def sees_expense(opened, who, name, amount):
+    pattern = rf'data-name="{re.escape(name)}".*?class="amount">{re.escape(amount)}<'
+    assert re.search(pattern, opened["page"], re.S)
