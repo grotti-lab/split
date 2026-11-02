@@ -174,7 +174,7 @@ def is_owed(client, groups, name, amount):
     assert nets_on_page(client, groups)[name] == f"is owed {amount}"
 
 
-@then(parsers.parse("{name} owes {amount}"))
+@then(parsers.re(r"(?P<name>\S+) owes (?P<amount>\d+\.\d\d)"))
 def owes(client, groups, name, amount):
     assert nets_on_page(client, groups)[name] == f"owes {amount}"
 

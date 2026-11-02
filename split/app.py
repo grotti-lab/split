@@ -149,6 +149,16 @@ def create_app(db_path: str | Path | None = None) -> FastAPI:
                 {**_group_context(group, slug), "message": "Enter an amount above zero"},
                 status_code=422,
             )
+        # "owes" = what the suggested payments say payer pays payee (0 if none)
+        expenses = db.list_expenses(app.state.db_path, slug)
+        nets = balances.balances(group["members"], expenses, db.list_payments(app.state.db_path, slug))
+        owed = sum(c for f, t, c in balances.suggested_payments(nets) if f == payer and t == payee)
+        if cents > owed:
+            return TEMPLATES.TemplateResponse(
+                request, "group.html",
+                {**_group_context(group, slug), "message": f"{payer} only owes {payee} {money.format_amount(owed)}"},
+                status_code=422,
+            )
         db.add_payment(app.state.db_path, slug, payer, payee, cents)
         return RedirectResponse(f"/groups/{slug}", status_code=303)
 
