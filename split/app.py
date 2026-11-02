@@ -19,7 +19,7 @@ from fastapi import Form, FastAPI, HTTPException, Request
 from fastapi.responses import HTMLResponse, RedirectResponse, Response
 from fastapi.templating import Jinja2Templates
 
-from . import db, money
+from . import balances, db, money
 
 TEMPLATES = Jinja2Templates(directory=Path(__file__).parent / "templates")
 
@@ -57,7 +57,11 @@ def create_app(db_path: str | Path | None = None) -> FastAPI:
         for e in expenses:
             e["amount_text"] = money.format_amount(e["amount"])
             e["shares_text"] = [(n, money.format_amount(c)) for n, c in e["shares"]]
-        return {"group": group, "expenses": expenses}
+        nets = balances.nets(group["members"], expenses)
+        return {
+            "group": group, "expenses": expenses,
+            "balances": [(n, balances.net_text(nets[n])) for n in group["members"]],
+        }
 
     @app.get("/groups/{slug}", response_class=HTMLResponse)
     def show_group(request: Request, slug: str) -> HTMLResponse:
@@ -106,6 +110,13 @@ def create_app(db_path: str | Path | None = None) -> FastAPI:
         # equal split between everyone for now; other splits come in later tasks
         shares = money.split_equally(cents, group["members"], payer)
         db.add_expense(app.state.db_path, slug, description.strip(), cents, payer, shares)
+        return RedirectResponse(f"/groups/{slug}", status_code=303)
+
+    @app.post("/groups/{slug}/expenses/{expense_id}/delete")
+    def delete_expense(slug: str, expense_id: int) -> RedirectResponse:
+        # allowed even after settling up (Amina's decision #3)
+        if not db.delete_expense(app.state.db_path, slug, expense_id):
+            raise HTTPException(404, "No such expense")
         return RedirectResponse(f"/groups/{slug}", status_code=303)
 
     @app.get("/health")

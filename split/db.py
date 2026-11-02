@@ -109,7 +109,21 @@ def list_expenses(path: Path, slug: str) -> list[dict]:
             got = {r["member_id"]: r["share"] for r in conn.execute(
                 "SELECT member_id, share FROM expense_shares WHERE expense_id = ?", (e["id"],))}
             out.append({
-                "description": e["description"], "amount": e["amount"], "payer": e["payer"],
+                "id": e["id"], "description": e["description"], "amount": e["amount"], "payer": e["payer"],
                 "shares": [(m["name"], got.get(m["id"], 0)) for m in members],
             })
         return out
+
+
+def delete_expense(path: Path, slug: str, expense_id: int) -> bool:
+    """Delete an expense and its shares. False if the group or expense doesn't exist."""
+    with connect(path) as conn:
+        row = conn.execute(
+            "SELECT e.id FROM expenses e JOIN groups g ON g.id = e.group_id WHERE g.slug = ? AND e.id = ?",
+            (slug, expense_id),
+        ).fetchone()
+        if row is None:
+            return False
+        conn.execute("DELETE FROM expense_shares WHERE expense_id = ?", (expense_id,))
+        conn.execute("DELETE FROM expenses WHERE id = ?", (expense_id,))
+        return True

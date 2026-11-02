@@ -136,3 +136,28 @@ def shares_are(client, groups, name, shares):
 @then("the group has no expenses")
 def no_expenses(client, groups):
     assert expenses_on_page(client, groups) == {}
+
+
+@when(parsers.parse('someone deletes the expense "{name}"'))
+def delete_expense(client, groups, name):
+    link = list(groups.values())[-1]
+    page = client.get(link).text
+    for block in re.findall(r'<div class="expense".*?</form>', page, re.S):
+        if re.search(r'data-name="(.*?)"', block).group(1) == name:
+            action = re.search(r'<form method="post" action="(.*?)"', block).group(1)
+            assert client.post(action).status_code == 200
+            return
+    raise AssertionError(f"no expense {name!r} on the page")
+
+
+# --- balances (minimum for now; Balances adds "is owed" / "owes") ---------------------------
+
+def nets_on_page(client, groups) -> dict:
+    """Member -> net as shown on the group page (text such as '0.00')."""
+    page = client.get(list(groups.values())[-1]).text
+    return dict(re.findall(r'class="balance" data-member="[^"]*">(.*?) <span class="net">(.*?)</span>', page))
+
+
+@then(parsers.parse("{name} is settled up"))
+def settled_up(client, groups, name):
+    assert nets_on_page(client, groups)[name] == "0.00"
