@@ -18,6 +18,8 @@ def split_names(text: str) -> list[str]:
     return [n.strip() for n in re.split(r",|\band\b", text) if n.strip()]
 
 
+
+
 @pytest.fixture
 def groups() -> dict:
     """Group name -> the group's link, for the scenario's groups."""
@@ -118,3 +120,22 @@ def shares_are(client, groups, name, shares):
 @then("the group has no expenses")
 def no_expenses(client, groups):
     assert expenses_on_page(client, groups) == {}
+
+
+@pytest.fixture
+def last() -> dict:
+    """The last response a scenario's action got, for steps that check what the person saw."""
+    return {}
+
+
+@when(parsers.parse("someone adds another member called {name}"))
+def add_duplicate_member(client, groups, last, name):
+    link = list(groups.values())[-1]
+    last["response"] = client.post(link + "/members", data={"name": name})
+
+
+@then(parsers.parse('they see the message "{message}"'))
+def see_message(last, message):
+    import html
+
+    assert message in html.unescape(last["response"].text)

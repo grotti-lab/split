@@ -24,6 +24,12 @@ from . import db, money
 TEMPLATES = Jinja2Templates(directory=Path(__file__).parent / "templates")
 
 
+def same_name(a: str, b: str) -> bool:
+    """Are two member names the same? Exact match for now: whether "ana" equals "Ana"
+    is an open question for the product owner. Change it here, in one place."""
+    return a == b
+
+
 def create_app(db_path: str | Path | None = None) -> FastAPI:
     app = FastAPI(title="Split")
     app.state.db_path = Path(db_path or os.environ.get("SPLIT_DB", "split.db"))
@@ -62,12 +68,20 @@ def create_app(db_path: str | Path | None = None) -> FastAPI:
         return TEMPLATES.TemplateResponse(request, "group.html", _group_context(group, slug))
 
     @app.post("/groups/{slug}/members")
-    def add_member(slug: str, name: str = Form(...)) -> RedirectResponse:
+    def add_member(request: Request, slug: str, name: str = Form(...)) -> RedirectResponse:
         name = name.strip()
         if not name:
             raise HTTPException(422, "A member needs a name")
-        if not db.add_member(app.state.db_path, slug, name):
+        group = db.get_group(app.state.db_path, slug)
+        if group is None:
             raise HTTPException(404, "No such group")
+        if any(same_name(name, m) for m in group["members"]):
+            return TEMPLATES.TemplateResponse(
+                request, "group.html",
+                {**_group_context(group, slug), "message": f"There is already an {name} in this group"},
+                status_code=409,
+            )
+        db.add_member(app.state.db_path, slug, name)
         return RedirectResponse(f"/groups/{slug}", status_code=303)
 
     @app.post("/groups/{slug}/expenses")
