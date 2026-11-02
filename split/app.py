@@ -89,6 +89,22 @@ def create_app(db_path: str | Path | None = None) -> FastAPI:
         db.add_member(app.state.db_path, slug, name)
         return RedirectResponse(f"/groups/{slug}", status_code=303)
 
+    @app.post("/groups/{slug}/members/remove")
+    def remove_member(request: Request, slug: str, name: str = Form(...)) -> Response:
+        group = db.get_group(app.state.db_path, slug)
+        if group is None:
+            raise HTTPException(404, "No such group")
+        result = db.remove_member(app.state.db_path, slug, name)
+        if result == "missing":
+            raise HTTPException(404, "No such member")
+        if result == "has_expenses":
+            return TEMPLATES.TemplateResponse(
+                request, "group.html",
+                {**_group_context(group, slug), "message": f"{name} has expenses in this group, so they can't be removed"},
+                status_code=409,
+            )
+        return RedirectResponse(f"/groups/{slug}", status_code=303)
+
     @app.post("/groups/{slug}/expenses")
     def add_expense(
         request: Request, slug: str, description: str = Form(...), amount: str = Form(...), payer: str = Form(...)

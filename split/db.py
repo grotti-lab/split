@@ -115,6 +115,25 @@ def list_expenses(path: Path, slug: str) -> list[dict]:
         return out
 
 
+def remove_member(path: Path, slug: str, name: str) -> str:
+    """Remove a member. "removed", "has_expenses" (paid or has a share: kept) or "missing"."""
+    with connect(path) as conn:
+        m = conn.execute(
+            "SELECT m.id FROM members m JOIN groups g ON g.id = m.group_id WHERE g.slug = ? AND m.name = ?",
+            (slug, name),
+        ).fetchone()
+        if m is None:
+            return "missing"
+        used = conn.execute(
+            "SELECT 1 FROM expenses WHERE payer_id = ?1 UNION SELECT 1 FROM expense_shares WHERE member_id = ?1",
+            (m["id"],),
+        ).fetchone()
+        if used:
+            return "has_expenses"
+        conn.execute("DELETE FROM members WHERE id = ?", (m["id"],))
+        return "removed"
+
+
 def delete_expense(path: Path, slug: str, expense_id: int) -> bool:
     """Delete an expense and its shares. False if the group or expense doesn't exist."""
     with connect(path) as conn:
