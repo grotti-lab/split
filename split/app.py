@@ -57,11 +57,12 @@ def create_app(db_path: str | Path | None = None) -> FastAPI:
         for e in expenses:
             e["amount_text"] = money.format_amount(e["amount"])
             e["shares_text"] = [(n, money.format_amount(c)) for n, c in e["shares"]]
-        nets = balances.balances(group["members"], expenses)
+        nets = balances.balances(group["members"], expenses, db.list_payments(app.state.db_path, slug))
         return {
             "group": group, "expenses": expenses,
             "balances": [(n, balances.net_text(nets[n])) for n in group["members"]],
             "payments": [balances.payment_text(p) for p in balances.suggested_payments(nets)],
+            "all_settled": bool(expenses or db.list_payments(app.state.db_path, slug)) and not any(nets.values()),
         }
 
     @app.get("/groups/{slug}", response_class=HTMLResponse)
@@ -131,6 +132,38 @@ def create_app(db_path: str | Path | None = None) -> FastAPI:
         sharers = [m for m in group["members"] if m in sharing] or group["members"]
         shares = money.split_equally(cents, sharers, payer)
         db.add_expense(app.state.db_path, slug, description.strip(), cents, payer, shares)
+        return RedirectResponse(f"/groups/{slug}", status_code=303)
+
+    @app.post("/groups/{slug}/payments")
+    def add_payment(
+        request: Request, slug: str, payer: str = Form(...), payee: str = Form(...), amount: str = Form(...),
+    ) -> Response:
+        group = db.get_group(app.state.db_path, slug)
+        if group is None:
+            raise HTTPException(404, "No such group")
+        if payer not in group["members"] or payee not in group["members"] or payer == payee:
+            raise HTTPException(422, "A payment is between two different members of the group")
+        try:
+            cents = money.parse_amount(amount)
+        except ValueError:
+            cents = 0
+        if cents <= 0:
+            return TEMPLATES.TemplateResponse(
+                request, "group.html",
+                {**_group_context(group, slug), "message": "Enter an amount above zero"},
+                status_code=422,
+            )
+        # "owes" = what the suggested payments say payer pays payee (0 if none)
+        expenses = db.list_expenses(app.state.db_path, slug)
+        nets = balances.balances(group["members"], expenses, db.list_payments(app.state.db_path, slug))
+        owed = sum(c for f, t, c in balances.suggested_payments(nets) if f == payer and t == payee)
+        if cents > owed:
+            return TEMPLATES.TemplateResponse(
+                request, "group.html",
+                {**_group_context(group, slug), "message": f"{payer} only owes {payee} {money.format_amount(owed)}"},
+                status_code=422,
+            )
+        db.add_payment(app.state.db_path, slug, payer, payee, cents)
         return RedirectResponse(f"/groups/{slug}", status_code=303)
 
     @app.post("/groups/{slug}/expenses/{expense_id}/delete")

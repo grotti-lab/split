@@ -189,7 +189,7 @@ def is_owed(client, groups, name, amount):
     assert nets_on_page(client, groups)[name] == f"is owed {amount}"
 
 
-@then(parsers.parse("{name} owes {amount}"))
+@then(parsers.re(r"(?P<name>\S+) owes (?P<amount>\d+\.\d\d)"))
 def owes(client, groups, name, amount):
     assert nets_on_page(client, groups)[name] == f"owes {amount}"
 
@@ -237,3 +237,19 @@ def sees_members(opened, who, members):
 def sees_expense(opened, who, name, amount):
     pattern = rf'data-name="{re.escape(name)}".*?class="amount">{re.escape(amount)}<'
     assert re.search(pattern, opened["page"], re.S)
+
+
+# --- settle up ---------------------------------------------------------------------------
+
+@when(parsers.parse("{who} records paying {to} {amount}"))
+@given(parsers.parse("{who} recorded paying {to} {amount}"))
+def records_payment(client, groups, last, who, to, amount):
+    link = list(groups.values())[-1]
+    last["response"] = client.post(link + "/payments", data={"payer": who, "payee": to, "amount": amount})
+
+
+@then(parsers.parse('the group shows "{text}"'))
+def group_shows(client, groups, text):
+    import html
+
+    assert text in html.unescape(client.get(list(groups.values())[-1]).text)
