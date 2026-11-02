@@ -16,10 +16,10 @@ import re
 import secrets
 
 from fastapi import Form, FastAPI, HTTPException, Request
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, RedirectResponse, Response
 from fastapi.templating import Jinja2Templates
 
-from . import db
+from . import db, money
 
 TEMPLATES = Jinja2Templates(directory=Path(__file__).parent / "templates")
 
@@ -53,12 +53,19 @@ def create_app(db_path: str | Path | None = None) -> FastAPI:
         db.create_group(app.state.db_path, slug, name.strip(), names)
         return RedirectResponse(f"/groups/{slug}", status_code=303)
 
+    def _group_context(group: dict, slug: str) -> dict:
+        expenses = db.list_expenses(app.state.db_path, slug)
+        for e in expenses:
+            e["amount_text"] = money.format_amount(e["amount"])
+            e["shares_text"] = [(n, money.format_amount(c)) for n, c in e["shares"]]
+        return {"group": group, "expenses": expenses}
+
     @app.get("/groups/{slug}", response_class=HTMLResponse)
     def show_group(request: Request, slug: str) -> HTMLResponse:
         group = db.get_group(app.state.db_path, slug)
         if group is None:
             raise HTTPException(404, "No such group")
-        return TEMPLATES.TemplateResponse(request, "group.html", {"group": group})
+        return TEMPLATES.TemplateResponse(request, "group.html", _group_context(group, slug))
 
     @app.post("/groups/{slug}/members")
     def add_member(request: Request, slug: str, name: str = Form(...)) -> RedirectResponse:
@@ -75,6 +82,30 @@ def create_app(db_path: str | Path | None = None) -> FastAPI:
                 status_code=409,
             )
         db.add_member(app.state.db_path, slug, name)
+        return RedirectResponse(f"/groups/{slug}", status_code=303)
+
+    @app.post("/groups/{slug}/expenses")
+    def add_expense(
+        request: Request, slug: str, description: str = Form(...), amount: str = Form(...), payer: str = Form(...)
+    ) -> Response:
+        group = db.get_group(app.state.db_path, slug)
+        if group is None:
+            raise HTTPException(404, "No such group")
+        if not description.strip() or payer not in group["members"]:
+            raise HTTPException(422, "An expense needs a description and a payer from the group")
+        try:
+            cents = money.parse_amount(amount)
+        except ValueError:
+            cents = 0  # not a number, or negative: refused like zero
+        if cents <= 0:
+            return TEMPLATES.TemplateResponse(
+                request, "group.html",
+                {**_group_context(group, slug), "message": "Enter an amount above zero"},
+                status_code=422,
+            )
+        # equal split between everyone for now; other splits come in later tasks
+        shares = money.split_equally(cents, group["members"], payer)
+        db.add_expense(app.state.db_path, slug, description.strip(), cents, payer, shares)
         return RedirectResponse(f"/groups/{slug}", status_code=303)
 
     @app.get("/health")

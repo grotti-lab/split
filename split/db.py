@@ -8,7 +8,7 @@ from __future__ import annotations
 import sqlite3
 from pathlib import Path
 
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT NOT NULL);
 CREATE TABLE IF NOT EXISTS groups (
@@ -21,6 +21,19 @@ CREATE TABLE IF NOT EXISTS members (
     group_id INTEGER NOT NULL REFERENCES groups(id),
     name TEXT NOT NULL,
     UNIQUE (group_id, name)
+);
+CREATE TABLE IF NOT EXISTS expenses (
+    id INTEGER PRIMARY KEY,
+    group_id INTEGER NOT NULL REFERENCES groups(id),
+    description TEXT NOT NULL,
+    amount INTEGER NOT NULL,  -- whole cents
+    payer_id INTEGER NOT NULL REFERENCES members(id)
+);
+CREATE TABLE IF NOT EXISTS expense_shares (
+    expense_id INTEGER NOT NULL REFERENCES expenses(id),
+    member_id INTEGER NOT NULL REFERENCES members(id),
+    share INTEGER NOT NULL,  -- whole cents
+    PRIMARY KEY (expense_id, member_id)
 );
 """
 
@@ -61,3 +74,42 @@ def add_member(path: Path, slug: str, name: str) -> bool:
             return False
         conn.execute("INSERT INTO members(group_id, name) VALUES(?, ?)", (g["id"], name))
         return True
+
+
+def add_expense(path: Path, slug: str, description: str, amount: int, payer: str, shares: dict[str, int]) -> bool:
+    """Record an expense; shares maps member name -> cents. False if the group doesn't exist."""
+    with connect(path) as conn:
+        g = conn.execute("SELECT id FROM groups WHERE slug = ?", (slug,)).fetchone()
+        if g is None:
+            return False
+        ids = {r["name"]: r["id"] for r in conn.execute("SELECT id, name FROM members WHERE group_id = ?", (g["id"],))}
+        cur = conn.execute(
+            "INSERT INTO expenses(group_id, description, amount, payer_id) VALUES(?, ?, ?, ?)",
+            (g["id"], description, amount, ids[payer]),
+        )
+        conn.executemany(
+            "INSERT INTO expense_shares(expense_id, member_id, share) VALUES(?, ?, ?)",
+            [(cur.lastrowid, ids[m], c) for m, c in shares.items()],
+        )
+        return True
+
+
+def list_expenses(path: Path, slug: str) -> list[dict]:
+    """The group's expenses, oldest first, each with amount, payer and a share (cents) for every member."""
+    with connect(path) as conn:
+        g = conn.execute("SELECT id FROM groups WHERE slug = ?", (slug,)).fetchone()
+        if g is None:
+            return []
+        members = conn.execute("SELECT id, name FROM members WHERE group_id = ? ORDER BY id", (g["id"],)).fetchall()
+        out = []
+        for e in conn.execute(
+            "SELECT e.id, e.description, e.amount, m.name AS payer FROM expenses e "
+            "JOIN members m ON m.id = e.payer_id WHERE e.group_id = ? ORDER BY e.id", (g["id"],)
+        ).fetchall():
+            got = {r["member_id"]: r["share"] for r in conn.execute(
+                "SELECT member_id, share FROM expense_shares WHERE expense_id = ?", (e["id"],))}
+            out.append({
+                "description": e["description"], "amount": e["amount"], "payer": e["payer"],
+                "shares": [(m["name"], got.get(m["id"], 0)) for m in members],
+            })
+        return out
