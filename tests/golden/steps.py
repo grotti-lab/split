@@ -54,3 +54,67 @@ def add_member(client, groups, name):
 def group_has_members(client, groups, name, members):
     page = client.get(groups[name]).text
     assert re.findall(r"<li>(.*?)</li>", page) == split_names(members)
+
+
+# --- expenses -------------------------------------------------------------------------------
+
+def parse_split(clause: str) -> dict:
+    """The split clause of an expense step, as the form fields for it.
+
+    "split equally" is built. Later tasks add "split between X and Y" and
+    "split by amounts Ana 10.00, Ben 5.00" here, in this one place.
+    """
+    clause = clause.strip()
+    if clause == "split equally":
+        return {}
+    raise NotImplementedError(f"split clause not built yet: {clause!r}")
+
+
+def post_expense(client, groups, name, amount, payer, split):
+    link = list(groups.values())[-1]
+    data = {"description": name, "amount": amount, "payer": payer, **parse_split(split)}
+    return client.post(link + "/expenses", data=data)
+
+
+@when(parsers.parse('{who} adds an expense "{name}" of {amount} paid by {payer}, {split}'))
+def add_expense(client, groups, who, name, amount, payer, split):
+    post_expense(client, groups, name, amount, payer, split)
+
+
+@given(parsers.parse('an expense "{name}" of {amount} paid by {payer}, {split}'))
+def existing_expense(client, groups, name, amount, payer, split):
+    assert post_expense(client, groups, name, amount, payer, split).status_code == 200
+
+
+def expenses_on_page(client, groups) -> dict:
+    """Expense name -> {'amount', 'payer', 'shares': {member: 'x.xx'}}, read off the group page."""
+    page = client.get(list(groups.values())[-1]).text
+    found = {}
+    for block in re.findall(r'<div class="expense".*?</div>\s*</div>', page, re.S):
+        name = re.search(r'data-name="(.*?)"', block).group(1)
+        found[name] = {
+            "amount": re.search(r'class="amount">(.*?)<', block).group(1),
+            "payer": re.search(r'class="payer">(.*?)<', block).group(1),
+            "shares": dict(re.findall(r'data-member="[^"]*">(.*?) (-?\d+\.\d\d)<', block)),
+        }
+    return found
+
+
+@then(parsers.parse('the expense "{name}" shows {amount} paid by {payer}'))
+def expense_shows(client, groups, name, amount, payer):
+    e = expenses_on_page(client, groups)[name]
+    assert (e["amount"], e["payer"]) == (amount, payer)
+
+
+@then(parsers.parse('the shares of "{name}" are {shares}'))
+def shares_are(client, groups, name, shares):
+    expected = {}
+    for part in split_names(shares):
+        who, amount = part.rsplit(" ", 1)
+        expected[who] = amount
+    assert expenses_on_page(client, groups)[name]["shares"] == expected
+
+
+@then("the group has no expenses")
+def no_expenses(client, groups):
+    assert expenses_on_page(client, groups) == {}
