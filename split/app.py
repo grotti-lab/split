@@ -25,9 +25,8 @@ TEMPLATES = Jinja2Templates(directory=Path(__file__).parent / "templates")
 
 
 def same_name(a: str, b: str) -> bool:
-    """Are two member names the same? Exact match for now: whether "ana" equals "Ana"
-    is an open question for the product owner. Change it here, in one place."""
-    return a == b
+    """Are two member names the same? Capitals don't matter: "ana" is "Ana"."""
+    return a.casefold() == b.casefold()
 
 
 def create_app(db_path: str | Path | None = None) -> FastAPI:
@@ -75,10 +74,11 @@ def create_app(db_path: str | Path | None = None) -> FastAPI:
         group = db.get_group(app.state.db_path, slug)
         if group is None:
             raise HTTPException(404, "No such group")
-        if any(same_name(name, m) for m in group["members"]):
+        existing = next((m for m in group["members"] if same_name(name, m)), None)
+        if existing is not None:
             return TEMPLATES.TemplateResponse(
                 request, "group.html",
-                {**_group_context(group, slug), "message": f"There is already an {name} in this group"},
+                {**_group_context(group, slug), "message": f"There is already an {existing} in this group"},
                 status_code=409,
             )
         db.add_member(app.state.db_path, slug, name)
