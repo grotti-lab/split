@@ -85,14 +85,21 @@ def see_message(last, message):
 def parse_split(clause: str) -> dict:
     """The split clause of an expense step, as the form fields for it.
 
-    "split equally", "split between X and Y" and "for X only" are built. Later tasks add
-    "split by amounts Ana 10.00, Ben 5.00" here, in this one place.
+    "split equally", "split between X and Y", "for X only" and
+    "split by amounts Ana 10.00, Ben 5.00" are built.
     """
     clause = clause.strip()
     if clause == "split equally":
         return {}
     if clause.startswith("split between "):
         return {"sharing": split_names(clause[len("split between "):])}
+    if clause.startswith("split by amounts "):
+        parts = [part.rsplit(" ", 1) for part in split_names(clause[len("split by amounts "):])]
+        return {
+            "split_mode": "amounts",
+            "exact_member": [who for who, _ in parts],
+            "exact_amount": [amount for _, amount in parts],
+        }
     if clause.endswith(" only") and clause.startswith("for "):
         return {"sharing": [clause[4:-5].strip()]}
     raise NotImplementedError(f"split clause not built yet: {clause!r}")
