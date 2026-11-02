@@ -132,14 +132,24 @@ def delete_expense(client, groups, name):
     raise AssertionError(f"no expense {name!r} on the page")
 
 
-# --- balances (minimum for now; Balances adds "is owed" / "owes") ---------------------------
+# --- balances ----------------------------------------------------------------------------
 
 def nets_on_page(client, groups) -> dict:
-    """Member -> net as shown on the group page (text such as '0.00')."""
+    """Member -> net as shown on the group page (text such as 'is owed 20.00')."""
     page = client.get(list(groups.values())[-1]).text
     return dict(re.findall(r'class="balance" data-member="[^"]*">(.*?) <span class="net">(.*?)</span>', page))
 
 
 @then(parsers.parse("{name} is settled up"))
 def settled_up(client, groups, name):
-    assert nets_on_page(client, groups)[name] == "0.00"
+    assert nets_on_page(client, groups)[name] == "is settled up"
+
+
+@then(parsers.parse("{name} is owed {amount}"))
+def is_owed(client, groups, name, amount):
+    assert nets_on_page(client, groups)[name] == f"is owed {amount}"
+
+
+@then(parsers.parse("{name} owes {amount}"))
+def owes(client, groups, name, amount):
+    assert nets_on_page(client, groups)[name] == f"owes {amount}"
