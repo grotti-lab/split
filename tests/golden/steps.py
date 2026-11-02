@@ -124,6 +124,23 @@ def expenses_on_page(client, groups) -> dict:
     return found
 
 
+def expense_form_action(client, groups, name, suffix):
+    """The action of the expense's form on the group page whose action ends with suffix."""
+    page = client.get(list(groups.values())[-1]).text
+    for block in re.findall(r'<div class="expense".*?</div>\s*</div>', page, re.S):
+        if re.search(r'data-name="(.*?)"', block).group(1) == name:
+            for action in re.findall(r'<form[^>]*action="(.*?)"', block):
+                if action.endswith(suffix):
+                    return action
+    raise AssertionError(f"no expense {name!r} on the page")
+
+
+@when(parsers.parse('someone changes the amount of "{name}" to {amount}'))
+def change_amount(client, groups, last, name, amount):
+    action = expense_form_action(client, groups, name, "/edit")
+    last["response"] = client.post(action, data={"amount": amount})
+
+
 @then(parsers.parse('the expense "{name}" shows {amount} paid by {payer}'))
 def expense_shows(client, groups, name, amount, payer):
     e = expenses_on_page(client, groups)[name]
@@ -146,14 +163,8 @@ def no_expenses(client, groups):
 
 @when(parsers.parse('someone deletes the expense "{name}"'))
 def delete_expense(client, groups, name):
-    link = list(groups.values())[-1]
-    page = client.get(link).text
-    for block in re.findall(r'<div class="expense".*?</form>', page, re.S):
-        if re.search(r'data-name="(.*?)"', block).group(1) == name:
-            action = re.search(r'<form method="post" action="(.*?)"', block).group(1)
-            assert client.post(action).status_code == 200
-            return
-    raise AssertionError(f"no expense {name!r} on the page")
+    action = expense_form_action(client, groups, name, "/delete")
+    assert client.post(action).status_code == 200
 
 
 # --- balances ----------------------------------------------------------------------------
