@@ -107,7 +107,8 @@ def create_app(db_path: str | Path | None = None) -> FastAPI:
 
     @app.post("/groups/{slug}/expenses")
     def add_expense(
-        request: Request, slug: str, description: str = Form(...), amount: str = Form(...), payer: str = Form(...)
+        request: Request, slug: str, description: str = Form(...), amount: str = Form(...), payer: str = Form(...),
+        sharing: list[str] = Form(default=[]),
     ) -> Response:
         group = db.get_group(app.state.db_path, slug)
         if group is None:
@@ -124,8 +125,11 @@ def create_app(db_path: str | Path | None = None) -> FastAPI:
                 {**_group_context(group, slug), "message": "Enter an amount above zero"},
                 status_code=422,
             )
-        # equal split between everyone for now; other splits come in later tasks
-        shares = money.split_equally(cents, group["members"], payer)
+        # equal split between the members sharing (everyone if none are chosen), in the group's order
+        if any(n not in group["members"] for n in sharing):
+            raise HTTPException(422, "Only members of the group can share an expense")
+        sharers = [m for m in group["members"] if m in sharing] or group["members"]
+        shares = money.split_equally(cents, sharers, payer)
         db.add_expense(app.state.db_path, slug, description.strip(), cents, payer, shares)
         return RedirectResponse(f"/groups/{slug}", status_code=303)
 
