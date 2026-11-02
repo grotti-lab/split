@@ -43,9 +43,19 @@
   <h2>Suggested payments</h2>
   <div class="payments">
     {% for p in payments %}<div class="payment">{{ p }}</div>
-    {% else %}<p class="none">Nothing to pay</p>
+    {% else %}<p class="none">{% if all_settled %}Everyone is settled up{% else %}Nothing to pay{% endif %}</p>
     {% endfor %}
   </div>
+  <form method="post" action="/groups/{{ group.slug }}/payments">
+    <label>Who paid <select name="payer">
+      {% for m in group.members %}<option>{{ m }}</option>{% endfor %}
+    </select></label>
+    <label>Paid to <select name="payee">
+      {% for m in group.members %}<option>{{ m }}</option>{% endfor %}
+    </select></label>
+    <label>Amount <input name="amount" inputmode="decimal" required></label>
+    <button type="submit">Record payment</button>
+  </form>
   <form method="post" action="/groups/{{ group.slug }}/expenses">
     <label>What <input name="description" required></label>
     <label>Amount <input name="amount" inputmode="decimal" required></label>

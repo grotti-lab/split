@@ -8,7 +8,7 @@ from __future__ import annotations
 import sqlite3
 from pathlib import Path
 
-SCHEMA_VERSION = 2
+SCHEMA_VERSION = 3
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT NOT NULL);
 CREATE TABLE IF NOT EXISTS groups (
@@ -34,6 +34,13 @@ CREATE TABLE IF NOT EXISTS expense_shares (
     member_id INTEGER NOT NULL REFERENCES members(id),
     share INTEGER NOT NULL,  -- whole cents
     PRIMARY KEY (expense_id, member_id)
+);
+CREATE TABLE IF NOT EXISTS payments (
+    id INTEGER PRIMARY KEY,
+    group_id INTEGER NOT NULL REFERENCES groups(id),
+    from_id INTEGER NOT NULL REFERENCES members(id),
+    to_id INTEGER NOT NULL REFERENCES members(id),
+    amount INTEGER NOT NULL  -- whole cents
 );
 """
 
@@ -146,3 +153,28 @@ def delete_expense(path: Path, slug: str, expense_id: int) -> bool:
         conn.execute("DELETE FROM expense_shares WHERE expense_id = ?", (expense_id,))
         conn.execute("DELETE FROM expenses WHERE id = ?", (expense_id,))
         return True
+
+
+def add_payment(path: Path, slug: str, payer: str, payee: str, amount: int) -> bool:
+    """Record that payer paid payee (cents). False if the group or a member doesn't exist."""
+    with connect(path) as conn:
+        g = conn.execute("SELECT id FROM groups WHERE slug = ?", (slug,)).fetchone()
+        if g is None:
+            return False
+        ids = {r["name"]: r["id"] for r in conn.execute("SELECT id, name FROM members WHERE group_id = ?", (g["id"],))}
+        if payer not in ids or payee not in ids:
+            return False
+        conn.execute(
+            "INSERT INTO payments(group_id, from_id, to_id, amount) VALUES(?, ?, ?, ?)",
+            (g["id"], ids[payer], ids[payee], amount),
+        )
+        return True
+
+
+def list_payments(path: Path, slug: str) -> list[dict]:
+    """The group's payments, oldest first: {id, from, to, amount}."""
+    with connect(path) as conn:
+        return [dict(r) for r in conn.execute(
+            "SELECT p.id, f.name AS \"from\", t.name AS \"to\", p.amount FROM payments p "
+            "JOIN groups g ON g.id = p.group_id JOIN members f ON f.id = p.from_id "
+            "JOIN members t ON t.id = p.to_id WHERE g.slug = ? ORDER BY p.id", (slug,))]
