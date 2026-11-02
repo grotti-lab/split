@@ -109,7 +109,8 @@ def create_app(db_path: str | Path | None = None) -> FastAPI:
     @app.post("/groups/{slug}/expenses")
     def add_expense(
         request: Request, slug: str, description: str = Form(...), amount: str = Form(...), payer: str = Form(...),
-        sharing: list[str] = Form(default=[]),
+        sharing: list[str] = Form(default=[]), split_mode: str = Form("equally"),
+        exact_member: list[str] = Form(default=[]), exact_amount: list[str] = Form(default=[]),
     ) -> Response:
         group = db.get_group(app.state.db_path, slug)
         if group is None:
@@ -126,6 +127,30 @@ def create_app(db_path: str | Path | None = None) -> FastAPI:
                 {**_group_context(group, slug), "message": "Enter an amount above zero"},
                 status_code=422,
             )
+        if split_mode == "amounts":
+            exact: dict[str, int] = {m: 0 for m in group["members"]}
+            for member, text in zip(exact_member, exact_amount):
+                if member not in exact:
+                    raise HTTPException(422, "Only members of the group can share an expense")
+                if text.strip():
+                    try:
+                        exact[member] = money.parse_amount(text)
+                    except ValueError:
+                        return TEMPLATES.TemplateResponse(
+                            request, "group.html",
+                            {**_group_context(group, slug), "message": f"{text.strip()} is not an amount"},
+                            status_code=422,
+                        )
+            total = sum(exact.values())
+            if total != cents:
+                return TEMPLATES.TemplateResponse(
+                    request, "group.html",
+                    {**_group_context(group, slug), "message":
+                        f"The shares add up to {money.format_amount(total)}, not {money.format_amount(cents)}"},
+                    status_code=422,
+                )
+            db.add_expense(app.state.db_path, slug, description.strip(), cents, payer, exact)
+            return RedirectResponse(f"/groups/{slug}", status_code=303)
         # equal split between the members sharing (everyone if none are chosen), in the group's order
         if any(n not in group["members"] for n in sharing):
             raise HTTPException(422, "Only members of the group can share an expense")

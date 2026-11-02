@@ -71,6 +71,13 @@
       {% for m in group.members %}<label><input type="checkbox" name="sharing" value="{{ m }}" checked> {{ m }}</label>
       {% endfor %}
     </fieldset>
+    <fieldset>
+      <legend>Split</legend>
+      <label><input type="radio" name="split_mode" value="equally" checked> equally between the members above</label>
+      <label><input type="radio" name="split_mode" value="amounts"> by amounts</label>
+      {% for m in group.members %}<label>{{ m }} <input type="hidden" name="exact_member" value="{{ m }}"><input name="exact_amount" inputmode="decimal" placeholder="0.00"></label>
+      {% endfor %}
+    </fieldset>
     <button type="submit">Add expense</button>
   </form>
 {% endblock %}
