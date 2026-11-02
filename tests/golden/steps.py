@@ -54,3 +54,22 @@ def add_member(client, groups, name):
 def group_has_members(client, groups, name, members):
     page = client.get(groups[name]).text
     assert re.findall(r"<li>(.*?)</li>", page) == split_names(members)
+
+
+@pytest.fixture
+def last() -> dict:
+    """The last response a scenario's action got, for steps that check what the person saw."""
+    return {}
+
+
+@when(parsers.parse("someone adds another member called {name}"))
+def add_duplicate_member(client, groups, last, name):
+    link = list(groups.values())[-1]
+    last["response"] = client.post(link + "/members", data={"name": name})
+
+
+@then(parsers.parse('they see the message "{message}"'))
+def see_message(last, message):
+    import html
+
+    assert message in html.unescape(last["response"].text)
