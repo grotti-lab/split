@@ -28,6 +28,10 @@
         {% for name, share in e.shares_text %}<span class="share" data-member="{{ name }}">{{ name }} {{ share }}</span>
         {% endfor %}
       </div>
+      <form class="edit" method="post" action="/groups/{{ group.slug }}/expenses/{{ e.id }}/edit">
+        <label>New amount <input name="amount" inputmode="decimal" value="{{ e.amount_text }}" required></label>
+        <button type="submit">Change amount</button>
+      </form>
       <form method="post" action="/groups/{{ group.slug }}/expenses/{{ e.id }}/delete">
         <button type="submit">Delete</button>
       </form>

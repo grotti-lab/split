@@ -178,3 +178,32 @@ def list_payments(path: Path, slug: str) -> list[dict]:
             "SELECT p.id, f.name AS \"from\", t.name AS \"to\", p.amount FROM payments p "
             "JOIN groups g ON g.id = p.group_id JOIN members f ON f.id = p.from_id "
             "JOIN members t ON t.id = p.to_id WHERE g.slug = ? ORDER BY p.id", (slug,))]
+
+
+def update_expense_amount(path: Path, slug: str, expense_id: int, amount: int) -> bool:
+    """Change an expense's amount and share it again, equally, among the same people who shared it.
+
+    False if the group or expense doesn't exist.
+    """
+    from . import money
+
+    with connect(path) as conn:
+        row = conn.execute(
+            "SELECT e.id, m.name AS payer FROM expenses e JOIN groups g ON g.id = e.group_id "
+            "JOIN members m ON m.id = e.payer_id WHERE g.slug = ? AND e.id = ?",
+            (slug, expense_id),
+        ).fetchone()
+        if row is None:
+            return False
+        sharing = conn.execute(
+            "SELECT m.id, m.name FROM expense_shares s JOIN members m ON m.id = s.member_id "
+            "WHERE s.expense_id = ? ORDER BY m.id", (expense_id,),
+        ).fetchall()
+        shares = money.split_equally(amount, [r["name"] for r in sharing], row["payer"])
+        conn.execute("UPDATE expenses SET amount = ? WHERE id = ?", (amount, expense_id))
+        for r in sharing:
+            conn.execute(
+                "UPDATE expense_shares SET share = ? WHERE expense_id = ? AND member_id = ?",
+                (shares[r["name"]], expense_id, r["id"]),
+            )
+        return True
