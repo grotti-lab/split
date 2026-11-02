@@ -56,6 +56,7 @@ def create_app(db_path: str | Path | None = None) -> FastAPI:
         return {
             "group": group, "expenses": expenses,
             "balances": [(n, balances.net_text(nets[n])) for n in group["members"]],
+            "payments": [balances.payment_text(p) for p in balances.suggested_payments(nets)],
         }
 
     @app.get("/groups/{slug}", response_class=HTMLResponse)
