@@ -16,12 +16,17 @@ import re
 import secrets
 
 from fastapi import Form, FastAPI, HTTPException, Request
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, RedirectResponse, Response
 from fastapi.templating import Jinja2Templates
 
 from . import balances, db, money
 
 TEMPLATES = Jinja2Templates(directory=Path(__file__).parent / "templates")
+
+
+def same_name(a: str, b: str) -> bool:
+    """Are two member names the same? Capitals don't matter: "ana" is "Ana"."""
+    return a.casefold() == b.casefold()
 
 
 def create_app(db_path: str | Path | None = None) -> FastAPI:
@@ -66,18 +71,27 @@ def create_app(db_path: str | Path | None = None) -> FastAPI:
         return TEMPLATES.TemplateResponse(request, "group.html", _group_context(group, slug))
 
     @app.post("/groups/{slug}/members")
-    def add_member(slug: str, name: str = Form(...)) -> RedirectResponse:
+    def add_member(request: Request, slug: str, name: str = Form(...)) -> RedirectResponse:
         name = name.strip()
         if not name:
             raise HTTPException(422, "A member needs a name")
-        if not db.add_member(app.state.db_path, slug, name):
+        group = db.get_group(app.state.db_path, slug)
+        if group is None:
             raise HTTPException(404, "No such group")
+        existing = next((m for m in group["members"] if same_name(name, m)), None)
+        if existing is not None:
+            return TEMPLATES.TemplateResponse(
+                request, "group.html",
+                {**_group_context(group, slug), "message": f"There is already an {existing} in this group"},
+                status_code=409,
+            )
+        db.add_member(app.state.db_path, slug, name)
         return RedirectResponse(f"/groups/{slug}", status_code=303)
 
     @app.post("/groups/{slug}/expenses")
     def add_expense(
-        slug: str, description: str = Form(...), amount: str = Form(...), payer: str = Form(...)
-    ) -> RedirectResponse:
+        request: Request, slug: str, description: str = Form(...), amount: str = Form(...), payer: str = Form(...)
+    ) -> Response:
         group = db.get_group(app.state.db_path, slug)
         if group is None:
             raise HTTPException(404, "No such group")
@@ -86,7 +100,13 @@ def create_app(db_path: str | Path | None = None) -> FastAPI:
         try:
             cents = money.parse_amount(amount)
         except ValueError:
-            raise HTTPException(422, "The amount must be a number like 30.00")
+            cents = 0  # not a number, or negative: refused like zero
+        if cents <= 0:
+            return TEMPLATES.TemplateResponse(
+                request, "group.html",
+                {**_group_context(group, slug), "message": "Enter an amount above zero"},
+                status_code=422,
+            )
         # equal split between everyone for now; other splits come in later tasks
         shares = money.split_equally(cents, group["members"], payer)
         db.add_expense(app.state.db_path, slug, description.strip(), cents, payer, shares)

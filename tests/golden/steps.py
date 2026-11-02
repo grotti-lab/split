@@ -56,6 +56,24 @@ def group_has_members(client, groups, name, members):
     assert re.findall(r"<li>(.*?)</li>", page) == split_names(members)
 
 
+@pytest.fixture
+def last() -> dict:
+    """The last response a scenario's action got, for steps that check what the person saw."""
+    return {}
+
+
+@when(parsers.parse("someone adds another member called {name}"))
+def add_duplicate_member(client, groups, last, name):
+    link = list(groups.values())[-1]
+    last["response"] = client.post(link + "/members", data={"name": name})
+
+
+@then(parsers.parse('they see the message "{message}"'))
+def see_message(last, message):
+    import html
+
+    assert message in html.unescape(last["response"].text)
+
 # --- expenses -------------------------------------------------------------------------------
 
 def parse_split(clause: str) -> dict:
@@ -77,8 +95,8 @@ def post_expense(client, groups, name, amount, payer, split):
 
 
 @when(parsers.parse('{who} adds an expense "{name}" of {amount} paid by {payer}, {split}'))
-def add_expense(client, groups, who, name, amount, payer, split):
-    post_expense(client, groups, name, amount, payer, split)
+def add_expense(client, groups, last, who, name, amount, payer, split):
+    last["response"] = post_expense(client, groups, name, amount, payer, split)
 
 
 @given(parsers.parse('an expense "{name}" of {amount} paid by {payer}, {split}'))
